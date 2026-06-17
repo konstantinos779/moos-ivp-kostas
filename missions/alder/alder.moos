@@ -20,7 +20,9 @@ ProcessConfig = ANTLER
   Run = pMarineViewer	@ NewConsole = false
   Run = uProcessWatch @ NewConsole = false
   Run = pHelmIvP      @ NewConsole = false
-  //Run = pOdometry     @ NewConsole = false
+  Run = pOdometry     @ NewConsole = false
+  Run = uXMS          @ NewConsole = true
+  Run = pLogger       @ NewConsole = false
 }
 
 //------------------------------------------
@@ -124,7 +126,8 @@ ProcessConfig = pMarineViewer
   hash_shade           = 0.4
   hash_viewable        = true
 
-  scope = ODOMETRY_DIST
+  scope = ODOMETRY_DIST, LEG_DIST
+
 
    // Appcast configuration
   appcast_height       = 75
@@ -135,10 +138,26 @@ ProcessConfig = pMarineViewer
   procs_font_size      = medium
   appcast_font_size    = small
 
-  BUTTON_ONE = DEPLOY # DEPLOY=true
-  BUTTON_ONE = MOOS_MANUAL_OVERIDE=false # RETURN=false
+  BUTTON_ONE = DEPLOY # DEPLOY=true # MOOS_MANUAL_OVERRIDE=false # RETURN=false
   BUTTON_TWO = RETURN # RETURN=true
 }
+//--------------------
+
+ProcessConfig = pOdometry
+{
+  AppTick   = 4
+  CommsTick = 4
+  
+  // If you have converted pOdometry to an AppCastingMOOSApp:
+  app_logging = log
+  // Test your new variable here. 
+  STALE_THRESH = 8 
+
+  
+  ALT_UNIT = miles
+  ALT_UNIT_MULT = 0.000621371
+}
+
 
 //------------------------------------------
 // pNodeReporter config block
@@ -147,6 +166,36 @@ ProcessConfig = pNodeReporter
 {
   AppTick	  = 2
   CommsTick	= 2
+  //vessel_type = kayak
+  platform_type = kayak
+}
 
-  vessel_type = kayak
+//--------------
+ProcessConfig = pLogger
+ {
+   AppTick   = 8
+   CommsTick = 8
+
+   AsyncLog = true
+   WildCardLogging = true
+ }
+
+//----------------------
+ProcessConfig = uXMS
+{
+  AppTick = 4
+  CommsTick = 4
+
+  // Variables to scope on:
+  VAR = ODOMETRY_DIST, NAV_X, NAV_Y
+  // You can also add variables on separate lines:
+  
+  // Display settings:
+  DISPLAY_SOURCE = true
+  DISPLAY_TIME   = true
+  DISPLAY_COMMUNITY = true
+  
+  // Optional viewing features:
+  COLOR_MAP   = DB_CLIENTS, red
+  HISTORY_VAR = DB_UPTIME
 }
