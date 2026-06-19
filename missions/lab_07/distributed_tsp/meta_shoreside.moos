@@ -21,11 +21,28 @@ Processconfig = ANTLER
   Run = uFldShoreBroker @ NewConsole = false
   Run = pRealm          @ NewConsole = false
   Run = uTimerScript    @ NewConsole = false
+  Run = pPointAssign    @ NewConsole = false
 }
 
 #include plug_pShare.moos
 #include plug_pHostInfo.moos
 #include plug_pLogger.moos
-#include  plug_uTimerScript.moos
+#include plug_uTimerScript.moos
 #include plug_uFldShoreBroker.moos
 #include plug_pMarineViewer.moos
+
+//------------------------------------------------
+// pPointAssign config block
+
+ProcessConfig = pPointAssign
+{
+  AppTick   = 4
+  CommsTick = 4
+
+  // Vehicles you want to assign points to
+  vname = henry
+  vname = gilda
+
+  // Toggle between alternating points (false) or East/West split (true)
+  assign_by_region = true 
+}

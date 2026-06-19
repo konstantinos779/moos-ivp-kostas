@@ -6,17 +6,21 @@ ProcessConfig = uTimerScript
   // Start paused to prevent firing points before pPointAssign connects
   //paused = true
   //pause_var = UTS_PAUSE
-  delay_start = 10
+  //delay_start = 10
+  //condition = DEPLOY_ALL = true
+
+  block_on = pPointAssign
+  
   // Define random variables for X and Y within the specified operation area
   rand_var = varname=RND_X, min=-25, max=200, key=at_post, snap=1
   rand_var = varname=RND_Y, min=-175, max=-25, key=at_post, snap=1
 
   // 1. Post the starting cue
-  event = var=VISIT_POINT, val="firstpoint", time=0
+  event = var=VISIT_POINT, val="firstpoint", time=10
   
   // 2. Post 100 random visit points
-  event = var=VISIT_POINT, val="x=$[RND_X], y=$[RND_Y], id=$[TCOUNT]", time=0, amt=100
+  event = var=VISIT_POINT, val="x=$[RND_X], y=$[RND_Y], id=$[TCOUNT]", time=10, amt=100
   
   // 3. Post the ending cue
-  event = var=VISIT_POINT, val="lastpoint", time=0
+  event = var=VISIT_POINT, val="lastpoint", time=10
 }

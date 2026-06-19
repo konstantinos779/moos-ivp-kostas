@@ -30,24 +30,26 @@ set MODE = REFUELING {
 set MODE = REFUEL_RETURNING {
   MODE = ACTIVE
   REFUEL_NEEDED = true
-} LOITERING
+} TOURING
 
 //----------------------------------------------
-Behavior = BHV_Loiter
+Behavior = BHV_Waypoint
 {
-  name      = loiter
+  name      = touring_points
   pwt       = 100
-  condition = MODE==LOITERING
+  condition = MODE==TOURING
+  updates = WPT_UPDATE
   perpetual = true
-   post_suffix = A
-         speed = 1.3
-     clockwise = false
-        radius = 8.0
-     nm_radius = 15.0
-       polygon = radial::$(LOITER_POS), radius=20, pts=8, snap=1, label=$(VNAME)_LOITER
+    speed =1.2
+    slip_radius = 15
+    radius = 3.0
+    nm_radius = 15.0
+    repeat = 0
+    points = $(START_POS)
+       
 
   visual_hints = nextpt_color=white, nextpt_lcolor=khaki
-  visual_hints = edge_color=orange, vertex_color=white
+  visual_hints = edge_color= dodger_blue, vertex_color=white
   visual_hints = edge_size=1, vertex_size=2
 }
 
