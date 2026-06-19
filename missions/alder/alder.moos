@@ -138,8 +138,14 @@ ProcessConfig = pMarineViewer
   procs_font_size      = medium
   appcast_font_size    = small
 
-  BUTTON_ONE = DEPLOY # DEPLOY=true # MOOS_MANUAL_OVERRIDE=false # RETURN=false
+  BUTTON_ONE = DEPLOY # DEPLOY=true
+  BUTTON_ONE = MOOS_MANUAL_OVERRIDE=false # RETURN=false
   BUTTON_TWO = RETURN # RETURN=true
+
+  left_context[view_point]  = VIEW_POINT = x=$(XPOS),y=$(YPOS),label=hello
+  left_context[view_poly]  = VIEW_POLYGON = format=radial,x=$(XPOS),y=$(YPOS),radius=10,pts=8,edge_size=1,label=mypoly
+  left_context[view_point2]  = VIEW_POINT = x=$(XPOS),y=$(YPOS),label=hello
+  left_context[view_point2]  = VIEW_POLYGON = format=radial,x=$(XPOS),y=$(YPOS),radius=10,pts=8,edge_size=1,label=mypoly
 }
 //--------------------
 

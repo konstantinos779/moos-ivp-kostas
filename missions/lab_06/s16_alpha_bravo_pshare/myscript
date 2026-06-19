@@ -1,0 +1,3 @@
+uPokeDB APPLES=1 alpha.moos
+sleep 5
+uPokeDB APPLES=2 alpha.moos

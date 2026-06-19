@@ -1,0 +1,170 @@
+//--------    FILE: bravo.bhv   -------------
+
+initialize   DEPLOY = false
+initialize   RETURN = false
+initialize   LOITER_REGION = west
+initialize   SURFACE_NEEDED = false
+	
+//----------------------------------------------
+Behavior = BHV_Loiter
+{
+  name      = loiter_west
+  pwt       = 100
+  condition = DEPLOY = true
+  condition = RETURN = false
+  
+  // 1. Make mutually exclusive
+  condition = LOITER_REGION = west
+
+  // 2. Set switching logic
+  duration  = 150
+  perpetual = true
+  duration_idle_decay = false
+  endflag   = LOITER_REGION = east
+
+  // 3. Original polygon settings
+  speed     = 2.5
+  clockwise = false
+  polygon   = radial:: x=100,y=-75,radius=30,pts=8
+}
+//-------------------------------
+Behavior = BHV_Loiter
+{
+  name      = loiter_east
+  pwt       = 100
+  condition = DEPLOY = true
+  condition = RETURN = false
+  
+  // 1. Make mutually exclusive
+  condition = LOITER_REGION = east
+
+  // 2. Set switching logic
+  duration  = 150
+  perpetual = true
+  duration_idle_decay = false
+  endflag   = LOITER_REGION = west
+
+  // 3. New polygon settings for the East region
+  speed     = 2.5
+  clockwise = false
+  polygon   = radial:: x=160,y=-50,radius=20,pts=8
+}
+
+//----------------------------------------------
+Behavior=BHV_Waypoint
+{
+  name      = waypt_return
+  pwt       = 100
+  condition = RETURN = true
+  condition = DEPLOY = true
+  perpetual = true
+  updates   = RETURN_UPDATE
+  endflag   = RETURN = false
+  endflag   = DEPLOY = false
+  endflag   = MISSION = complete
+
+           speed = 2.0
+  capture_radius = 2.0
+     slip_radius = 8.0
+          points = 0,-20
+        //points = 0, 0
+ }
+
+//----------------------------------------------
+Behavior=BHV_ConstantSpeed
+{
+  name      = const_speed
+  pwt       = 200
+  condition = SPD=true
+  condition = DEPLOY = true
+  perpetual = true
+  updates   = SPEED_UPDATE
+  endflag   = SPD = false
+
+  speed = 0.5
+	duration = 10
+	duration_reset = CONST_SPD_RESET=true
+	
+}
+
+//----------------------------------------------
+Behavior = BHV_ConstantSpeed
+{
+  name      = bhv_const_spd_surface
+  pwt       = 200
+  condition = SURFACE_NEEDED = true
+  condition = NAV_DEPTH < 0.2
+  speed     = 0
+  duration  = no-time-limit
+}
+//----------------------------------------------
+
+// West Depth Behavior (30 meters)
+Behavior = BHV_ConstantDepth
+{
+  name      = bhv_const_depth_west
+  pwt       = 100
+  duration  = no-time-limit
+  
+  // Tie this behavior to the West Loiter conditions
+  condition = DEPLOY = true
+  condition = LOITER_REGION = west
+  condition = SURFACE_NEEDED = false
+
+  depth = 30
+
+}
+
+//----------------------------------------------
+// East Depth Behavior (10 meters)
+Behavior = BHV_ConstantDepth
+{
+  name      = bhv_const_depth_east
+  pwt       = 100
+  duration  = no-time-limit
+  
+  // Tie this behavior to the East Loiter conditions
+  condition = DEPLOY = true
+  condition = LOITER_REGION = east
+  condition = SURFACE_NEEDED = false
+
+  depth = 10
+}
+
+//----------------------------------------------
+Behavior = BHV_Timer
+{
+  name                = bhv_timer_200
+  pwt                 = 100
+  condition           = DEPLOY = true
+  condition           = SURFACE_NEEDED = false
+  duration            = 200
+  perpetual           = true
+  duration_idle_decay = false
+  endflag             = SURFACE_NEEDED = true
+}
+
+//The Ascent Behavior When the 200-second timer posts its endflag, this behavior wakes up and brings the vehicle to the surface.
+
+//----------------------------------------------
+Behavior = BHV_ConstantDepth
+{
+  name      = bhv_const_depth_surface
+  pwt       = 100
+  condition = SURFACE_NEEDED = true
+  depth     = 0
+  duration  = no-time-limit
+}
+
+//----------------------------------------------
+Behavior = BHV_Timer
+{
+  name                = bhv_timer_60
+  pwt                 = 100
+  condition           = SURFACE_NEEDED = true
+  condition           = NAV_DEPTH < 0.2
+  duration            = 60
+  perpetual           = true
+  duration_idle_decay = false
+  endflag             = SURFACE_NEEDED = false
+}

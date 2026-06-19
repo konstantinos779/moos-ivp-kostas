@@ -43,6 +43,9 @@ class Odometry : public AppCastingMOOSApp
   double m_stale_thresh;
   std::string m_alt_unit;
   double m_alt_unit_mult;
+  double m_depth_thresh;
+  double m_current_depth;
+  double m_dist_at_depth;
 
  private: // State variables
   bool m_x_updated;

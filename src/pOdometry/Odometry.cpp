@@ -29,6 +29,9 @@ Odometry::Odometry()
   m_alt_unit_mult = 1.0;
   m_x_updated = false;
   m_y_updated = false;
+  m_depth_thresh = 0.0;
+  m_current_depth = 0.0;
+  m_dist_at_depth = 0.0;
 }
 
 //---------------------------------------------------------
@@ -67,6 +70,9 @@ bool Odometry::OnNewMail(MOOSMSG_LIST &NewMail)
     else if (key == "ALT_UNIT_MULT" && msg.IsDouble()) {
         m_alt_unit_mult = msg.GetDouble();
     }
+    else if (key == "NAV_DEPTH" && msg.IsDouble()) {
+        m_current_depth = msg.GetDouble();
+}
     else if (key != "APPCAST_REQ") {
         reportRunWarning("Unhandled Mail: " + key);
     }
@@ -83,8 +89,13 @@ bool Odometry::OnNewMail(MOOSMSG_LIST &NewMail)
 
             m_total_distance += leg_dist;
             
+            if (m_current_depth > m_depth_thresh) {
+                m_dist_at_depth += leg_dist;
+            }
             // You can safely publish LEG_DIST here for uXMS/pMarineViewer
             Notify("LEG_DIST", leg_dist);
+            // Publish the new variable to the MOOSDB
+Notify("ODOMETRY_DIST_AT_DEPTH", m_dist_at_depth);
 
             m_previous_x = m_current_x;
             m_previous_y = m_current_y;
@@ -181,6 +192,10 @@ bool Odometry::OnStartUp()
       m_alt_unit_mult = atof(value.c_str());
       handled = true;
     }
+    else if(param == "DEPTH_THRESH") {
+    m_depth_thresh = atof(value.c_str());
+    handled = true;
+    }
     if(!handled)
       reportUnhandledConfigWarning(orig);
   }
@@ -199,6 +214,7 @@ void Odometry::registerVariables()
   Register("NAV_Y", 0);
   Register("ALT_UNIT", 0);
   Register("ALT_UNIT_MULT", 0);
+  Register("NAV_DEPTH", 0);
 }
 
 
@@ -219,5 +235,9 @@ bool Odometry::buildReport()
       double alt_dist = m_total_distance * m_alt_unit_mult;
       m_msgs << "Total Distance (" << m_alt_unit << "): " << alt_dist << endl;
   }
+  
+  m_msgs << "Total Distance:    " << m_total_distance << endl;
+  m_msgs << "Depth Threshold:   " << m_depth_thresh << endl;
+  m_msgs << "Distance at Depth: " << m_dist_at_depth << endl;
   return(true);
 }

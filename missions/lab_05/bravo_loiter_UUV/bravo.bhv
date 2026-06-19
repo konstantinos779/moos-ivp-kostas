@@ -1,0 +1,116 @@
+//--------    FILE: bravo.bhv   -------------
+
+initialize   DEPLOY = false
+initialize   RETURN = false
+initialize   LOITER_REGION = west
+	
+//----------------------------------------------
+Behavior = BHV_Loiter
+{
+  name      = loiter_west
+  pwt       = 100
+  condition = DEPLOY = true
+  condition = RETURN = false
+  
+  // 1. Make mutually exclusive
+  condition = LOITER_REGION = west
+
+  // 2. Set switching logic
+  duration  = 150
+  perpetual = true
+  duration_idle_decay = false
+  endflag   = LOITER_REGION = east
+
+  // 3. Original polygon settings
+  speed     = 2.5
+  clockwise = false
+  polygon   = radial:: x=100,y=-75,radius=30,pts=8
+}
+//-------------------------------
+Behavior = BHV_Loiter
+{
+  name      = loiter_east
+  pwt       = 100
+  condition = DEPLOY = true
+  condition = RETURN = false
+  
+  // 1. Make mutually exclusive
+  condition = LOITER_REGION = east
+
+  // 2. Set switching logic
+  duration  = 150
+  perpetual = true
+  duration_idle_decay = false
+  endflag   = LOITER_REGION = west
+
+  // 3. New polygon settings for the East region
+  speed     = 2.5
+  clockwise = false
+  polygon   = radial:: x=160,y=-50,radius=20,pts=8
+}
+
+//----------------------------------------------
+Behavior=BHV_Waypoint
+{
+  name      = waypt_return
+  pwt       = 100
+  condition = (RETURN = true) or (ODOMETRY_DIST_AT_DEPTH >= 200)// Return if the button is pressed OR the distance is reached
+  condition = DEPLOY = true
+  perpetual = true
+  updates   = RETURN_UPDATE
+  endflag   = RETURN = false
+  endflag   = DEPLOY = false
+  endflag   = MISSION = complete
+
+           speed = 2.0
+  capture_radius = 2.0
+     slip_radius = 8.0
+          points = 0,-20
+        //points = 0, 0
+ }
+
+//----------------------------------------------
+Behavior=BHV_ConstantSpeed
+{
+  name      = const_speed
+  pwt       = 200
+  condition = SPD=true
+  condition = DEPLOY = true
+  perpetual = true
+  updates   = SPEED_UPDATE
+  endflag   = SPD = false
+
+  speed = 0.5
+  duration = 10
+	duration_reset = CONST_SPD_RESET=true
+	
+}
+//----------------------------------------------
+// West Depth Behavior (30 meters)
+Behavior = BHV_ConstantDepth
+{
+  name      = bhv_const_depth_west
+  pwt       = 100
+  duration  = no-time-limit
+  
+  // Tie this behavior to the West Loiter conditions
+  condition = DEPLOY = true
+  condition = LOITER_REGION = west
+
+  depth = 30
+}
+
+//----------------------------------------------
+// East Depth Behavior (10 meters)
+Behavior = BHV_ConstantDepth
+{
+  name      = bhv_const_depth_east
+  pwt       = 100
+  duration  = no-time-limit
+  
+  // Tie this behavior to the East Loiter conditions
+  condition = DEPLOY = true
+  condition = LOITER_REGION = east
+
+  depth = 10
+}
