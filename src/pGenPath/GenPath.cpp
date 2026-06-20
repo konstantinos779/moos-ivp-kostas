@@ -9,6 +9,7 @@
 #include "MBUtils.h"
 #include "ACTable.h"
 #include "GenPath.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -102,54 +103,99 @@ bool GenPath::Iterate()
 {
   AppCastingMOOSApp::Iterate();
   
-  // Only calculate the path once we have all points and haven't generated it yet
+  // ---------------------------------------------------------
+  // 1. Cross off points as the vehicle visits them
+  // ---------------------------------------------------------
+  std::vector<XYPoint>::iterator it = m_visit_points.begin();
+  while (it != m_visit_points.end()) {
+    double dist = hypot(m_nav_x - it->x(), m_nav_y - it->y());
+    
+    // If we are within the visit radius, erase the point!
+    if (dist <= m_visit_radius) {
+      it = m_visit_points.erase(it); 
+    } else {
+      ++it;
+    }
+  }
+
+  // ---------------------------------------------------------
+  // 2. Generate and optimize the path if ready
+  // ---------------------------------------------------------
   if (m_all_points_received && !m_path_generated) {
     
-    XYSegList my_seglist;
     double current_x = m_nav_x;
     double current_y = m_nav_y;
 
-    // Greedy shortest path algorithm
-    while (!m_visit_points.empty()) {
+    // Use a temporary copy of unvisited points for processing
+    std::vector<XYPoint> temp_points = m_visit_points;
+    std::vector<XYPoint> tour;
+
+    // A. Greedy shortest path initial pass
+    while (!temp_points.empty()) {
       int closest_idx = 0;
       double min_dist = -1;
 
-      for (unsigned int i = 0; i < m_visit_points.size(); i++) {
-        // hypot(dx, dy) safely calculates the distance
-        double dist = hypot(current_x - m_visit_points[i].x(), 
-                            current_y - m_visit_points[i].y());
+      for (unsigned int i = 0; i < temp_points.size(); i++) {
+        double dist = hypot(current_x - temp_points[i].x(), 
+                            current_y - temp_points[i].y());
         if (min_dist == -1 || dist < min_dist) {
           min_dist = dist;
           closest_idx = i;
         }
       }
 
-      // Add the closest point to our segment list
-      XYPoint closest_pt = m_visit_points[closest_idx];
-      my_seglist.add_vertex(closest_pt.x(), closest_pt.y());
+      XYPoint closest_pt = temp_points[closest_idx];
+      tour.push_back(closest_pt);
 
-      // Update our "current" position to this new point
       current_x = closest_pt.x();
       current_y = closest_pt.y();
 
-      // Remove the point we just visited from the pending list
-      m_visit_points.erase(m_visit_points.begin() + closest_idx);
+      temp_points.erase(temp_points.begin() + closest_idx);
     }
 
-    // Build the string specification and post it to the helm behavior [1, 2]
-    string update_str = "points = ";
+    // B. 2-opt "Untwisting" Algorithm
+    bool improvement = true;
+    while (improvement && tour.size() > 2) {
+      improvement = false;
+      
+      // Loop through all pairs of non-adjacent edges
+      for (int i = 1; i < tour.size() - 1; i++) {
+        for (int k = i + 1; k < tour.size(); k++) {
+          
+          // Calculate distance of the two current edges
+          double dist_current = hypot(tour[i-1].x() - tour[i].x(), tour[i-1].y() - tour[i].y()) +
+                                hypot(tour[k-1].x() - tour[k].x(), tour[k-1].y() - tour[k].y());
+
+          // Calculate the distance if we swapped them
+          double dist_new = hypot(tour[i-1].x() - tour[k-1].x(), tour[i-1].y() - tour[k-1].y()) +
+                            hypot(tour[i].x() - tour[k].x(), tour[i].y() - tour[k].y());
+
+          // If the new distance is strictly shorter, untwist the path!
+          if (dist_new < dist_current) {
+            std::reverse(tour.begin() + i, tour.begin() + k);
+            improvement = true;
+          }
+        }
+      }
+    }
+
+    // C. Build the XYSegList and Update the Helm
+    XYSegList my_seglist;
+    for (unsigned int i = 0; i < tour.size(); i++) {
+      my_seglist.add_vertex(tour[i].x(), tour[i].y());
+    }
+
+    // Build the string specification and post it to the helm behavior
+    std::string update_str = "points = ";
     update_str += my_seglist.get_spec();
     
-    // NOTE: Match "WPT_UPDATE" to the 'updates' parameter in your waypoint behavior
     Notify("WPT_UPDATE", update_str); 
-    
     m_path_generated = true; 
   }
 
   AppCastingMOOSApp::PostReport();
   return(true);
 }
-
 //---------------------------------------------------------
 // Procedure: OnStartUp()
 //            happens before connection is open
