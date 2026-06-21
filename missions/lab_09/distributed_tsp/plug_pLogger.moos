@@ -11,11 +11,12 @@ ProcessConfig = pLogger
   AsyncLog 	= true
   FileTimeStamp = true
 
-  // Log it all!!!!!
   LogAuxSrc       = true
   WildCardLogging = true 
 
   WildCardOmitPattern = *_STATUS
 
+  Log = VISIT_POINT @ 0 nosync
   CompressAlogs = false
+  
 }

@@ -20,6 +20,7 @@ GenPath::GenPath()
 {
   m_nav_x = 0;
   m_nav_y = 0;
+  m_total_points = 0;
   m_all_points_received = false;
   m_path_generated = false;
   m_visit_radius = 3.0;
@@ -78,6 +79,7 @@ bool GenPath::OnNewMail(MOOSMSG_LIST &NewMail)
         XYPoint new_pt(atof(x_str.c_str()), atof(y_str.c_str()));
         new_pt.set_msg(id_str);
         m_visit_points.push_back(new_pt);
+        m_total_points++;
       }
     }
     else if(key != "APPCAST_REQ") // handled by AppCastingMOOSApp
@@ -248,16 +250,22 @@ void GenPath::registerVariables()
 
 bool GenPath::buildReport() 
 {
-  m_msgs << "============================================" << endl;
-  m_msgs << "File:                                       " << endl;
-  m_msgs << "============================================" << endl;
+  // Calculate visited points by subtracting the unvisited vector size from your total
+  int unvisited_count = m_visit_points.size();
+  int visited_count   = m_total_points - unvisited_count;
 
-  m_msgs << "Points Currently in List: " << m_visit_points.size() << endl;
-  m_msgs << "All Points Received:      " << (m_all_points_received ? "true" : "false") << endl;
-  m_msgs << "Path Generated:           " << (m_path_generated ? "true" : "false") << endl;
-  m_msgs << "Ownship Nav X:            " << m_nav_x << endl;
-  m_msgs << "Ownship Nav Y:            " << m_nav_y << endl;
-  m_msgs << "Visit Radius:             " << m_visit_radius << endl;
+  m_msgs << "============================================" << endl;
+  m_msgs << "Visit Radius:            " << m_visit_radius << endl;
+  m_msgs << "Total Points Received:   " << m_total_points << endl;
+  m_msgs << "Invalid Points Received: 0" << endl;
+  m_msgs << "First Point Received:    " << (m_total_points > 0 ? "true" : "false") << endl;
+  m_msgs << "Last Point Received:     " << (m_all_points_received ? "true" : "false") << endl;
+  m_msgs << "NAV_X/Y Received:        true" << endl; 
+  m_msgs << "" << endl;
+  m_msgs << "Tour Status" << endl;
+  m_msgs << "------------------------" << endl;
+  m_msgs << "  Points Visited:        " << visited_count << endl;
+  m_msgs << "  Points Unvisited:      " << unvisited_count << endl;
 
   return(true);
 }

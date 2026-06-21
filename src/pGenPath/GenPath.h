@@ -38,6 +38,7 @@ class GenPath : public AppCastingMOOSApp
    bool   m_path_generated;
    std::vector<XYPoint> m_visit_points;
    double m_visit_radius; 
+   int m_total_points;
 
  private: // Configuration variables
 

@@ -1,0 +1,11 @@
+//------------------------------------------------
+// pGenPath config block
+
+ProcessConfig = pGenPath
+{
+  AppTick   = 4
+  CommsTick = 4
+  
+  // Sets the criteria for considering a waypoint visited
+  visit_radius = 3
+}
