@@ -32,6 +32,9 @@ GenRescue::GenRescue()
   m_nav_y = 0;
   m_nav_x_set = 0;
   m_nav_y_set = 0;
+  m_returning = false;
+  m_swimmers.clear();
+  m_rescued.clear();
 }
 
 //---------------------------------------------------------
@@ -49,10 +52,29 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
     string sval = msg.GetString();
 
     bool handled = true;
-    if(key == "SWIMMER_ALERT") 
+    // 1. DYNAMIC RETURN TRACKING (No one-way lock)
+    if (key == "RETURN") {
+      // Allow the flag to dynamically reflect the MOOSDB state
+      m_returning = (sval == "true" || sval == "TRUE");
+    }
+    // 2. FOUND SWIMMER (No longer ignored during return)
+    else if (key == "FOUND_SWIMMER") {
+      handleMailFoundSwimmer(sval);
+    }
+    // 3. SWIMMER ALERT (Dynamically abandon return if needed)
+    else if (key == "SWIMMER_ALERT") {
       handled = handleMailNewSwimmer(sval);
-    else if(key == "FOUND_SWIMMER") 
-      handled = handleMailFoundSwimmer(sval);
+    }
+    // 4. TOUR COMPLETE (The Missed Swimmer Check)
+    else if (key == "TOUR_COMPLETE" && (sval == "true" || sval == "TRUE")) {
+      if (m_swimmers.empty()) {
+        // We got them all! Command the helm to return home.
+        Notify("RETURN", "true");
+      } else {
+        // We missed some! Generate a new path to go back for them.
+        generateOptimizedPath();
+      }
+    }
     else if(key == "NAV_X") {
       m_nav_x = msg.GetDouble();
       m_nav_x_set = true;
@@ -67,6 +89,7 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
       if (sval == "true" || sval == "TRUE") {
         // The referee declared the mission finished!
         m_swimmers.clear();       // Erase the stuck last point
+        //////////////////////
         //m_returning = true;       // Lock the shield so we ignore late clicks
         Notify("RETURN", "true"); // Send the boat to the dock
       }
@@ -98,9 +121,22 @@ bool GenRescue::Iterate()
 {
   AppCastingMOOSApp::Iterate();
   
-  //if(m_plan_pending)
-  // if((m_iteration % 20) == 0)
-  //   postShortestPath();
+  if (!m_returning) {
+    std::map<std::string, XYPoint>::iterator it;
+    for(it = m_swimmers.begin(); it != m_swimmers.end(); it++) {
+      string id = it->first;
+      double sx = it->second.x();
+      double sy = it->second.y();
+      
+      // Calculate 2D distance between ownship and swimmer
+      double dist = hypot(sx - m_nav_x, sy - m_nav_y);
+
+      // If within 10 meters, ask the referee for the rescue
+      if (dist <= 10.0) { 
+        Notify("RESCUE_REQUEST", "vname=" + m_host_community + ",swimmer_id=" + id);
+      }
+    }
+  }
 
   AppCastingMOOSApp::PostReport();
   return(true);
@@ -137,6 +173,9 @@ void GenRescue::RegisterVariables()
   AppCastingMOOSApp::RegisterVariables();
   Register("SWIMMER_ALERT", 0);
   Register("FOUND_SWIMMER", 0);
+  Register("TOUR_COMPLETE", 0); 
+  Register("RETURN", 0);
+  Register("UFRM_FINISHED", 0); // Referee's game-over flag
 
   // tracking its own position
   Register("NAV_X", 0);
@@ -177,7 +216,13 @@ double x = 0;
     XYPoint new_swimmer(x, y);
     new_swimmer.set_label(id);
     m_swimmers[id] = new_swimmer;
-    
+
+    // 4. If the boat was heading home, ABANDON the return!
+    if (m_returning) {
+      m_returning = false;
+      Notify("RETURN", "false"); 
+    }
+    Notify("STATION_KEEP", "false"); 
     // Regenerate and update the path immediately
     generateOptimizedPath();
   }

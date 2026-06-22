@@ -45,6 +45,7 @@ class GenRescue : public AppCastingMOOSApp
   double     m_nav_y;
   bool       m_nav_x_set;
   bool       m_nav_y_set;
+  bool       m_returning;
   // The swimmer tracking map of unrescued swimmers, keyed by their unique ID
   std::map<std::string, XYPoint> m_swimmers;
   // NEW: Map to remember the IDs of swimmers we have already rescued
