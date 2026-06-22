@@ -1,6 +1,0 @@
-MOOSTimeWarp = $(WARP)
-// Hellenic Naval Academy, Athens (basin off the Academy)                       
-// Datum of moos_georef_20260616_081356 chart (Esri World Imagery)
-LatOrigin  = 37.9332599
-LongOrigin = 23.6282166
-

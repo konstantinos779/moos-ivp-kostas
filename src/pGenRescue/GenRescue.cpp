@@ -33,6 +33,13 @@ GenRescue::GenRescue()
   m_nav_x_set = 0;
   m_nav_y_set = 0;
   m_returning = false;
+  m_mid_x = 0.0;
+  m_mid_y = 0.0;
+  m_region_received = false;
+  m_start_x = 0.0;
+  m_start_y = 0.0;
+  m_outbound_phase = false;
+  m_outmost_id = "";
   m_swimmers.clear();
   m_rescued.clear();
 }
@@ -83,6 +90,17 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
       m_nav_y = msg.GetDouble();
       m_nav_y_set = true;
     }
+    else if (key == "RESCUE_REGION") {
+      XYPolygon poly = string2Poly(sval);
+      if (poly.is_convex()) {
+        double min_x = poly.get_min_x();
+        double max_x = poly.get_max_x();
+        
+        // Calculate the absolute East/West halfway line
+        m_mid_x = (min_x + max_x) / 2.0;
+        m_region_received = true;
+      }
+    }
      else if (key == "UFRM_FINISHED") {
       string sval = msg.GetString();
       
@@ -93,6 +111,17 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
         //m_returning = true;       // Lock the shield so we ignore late clicks
         Notify("RETURN", "true"); // Send the boat to the dock
       }
+    }
+    else if (key == "RESCUE_REGION") {
+      m_region_poly = string2Poly(sval);
+      if (m_region_poly.is_convex()) {
+        m_region_received = true;
+      }
+    }
+    else if (key == "STATION_KEEP") {
+      // You can store this in a class boolean (e.g., m_station_keeping) 
+      // if you want to track it later, or just let it pass to clear the warning!
+      bool is_keeping_station = (sval == "true" || sval == "TRUE");
     }
 
     else if(key != "APPCAST_REQ") // handle by AppCastingMOOSApp
@@ -150,17 +179,32 @@ bool GenRescue::OnStartUp()
   AppCastingMOOSApp::OnStartUp(); 
 
   STRING_LIST sParams;
-  m_MissionReader.GetConfiguration(GetAppName(), sParams);
+  
+  // Enable verbatim quoting to ensure the $(START_POS) macro is read correctly
+  m_MissionReader.EnableVerbatimQuoting(false);
+  
+  if(!m_MissionReader.GetConfiguration(GetAppName(), sParams))
+    reportConfigWarning("No config block found for " + GetAppName());
   
   STRING_LIST::iterator p;
   for(p=sParams.begin(); p!=sParams.end(); p++) {
     string sLine  = *p;
     string param  = tolower(stripBlankEnds(biteStringX(sLine, '=')));
-    string value  = sLine;
-    if(param == "vname")
+    string value  = stripBlankEnds(sLine); // Stripping blanks from the value is safer
+
+    // 1. Keep your existing vname parsing
+    if(param == "vname") {
       m_vname = value;
+    }
+    // 2. Add the start_pos parsing for the dividing line logic
+    else if(param == "start_pos") {
+      string x_str = biteStringX(value, ',');
+      string y_str = value;
+      m_start_x = atof(x_str.c_str());
+      m_start_y = atof(y_str.c_str());
+      m_start_pos_set = true;
+    }
   }
-  
   RegisterVariables();	
   return(true);
 }
@@ -175,7 +219,7 @@ void GenRescue::RegisterVariables()
   Register("FOUND_SWIMMER", 0);
   Register("TOUR_COMPLETE", 0); 
   Register("RETURN", 0);
-  Register("UFRM_FINISHED", 0); // Referee's game-over flag
+  Register("STATION_KEEP", 0); //Keep returning errors
 
   // tracking its own position
   Register("NAV_X", 0);
@@ -199,7 +243,7 @@ double x = 0;
   vector<string> svector = parseString(sval, ',');
   for(unsigned int i=0; i<svector.size(); i++) {
     string param = (stripBlankEnds(biteStringX(svector[i], '=')));
-    string value = svector[i];
+    string value = stripBlankEnds(svector[i]);
 
     if(param == "x") 
       x = atof(value.c_str());
@@ -268,168 +312,205 @@ bool GenRescue::handleMailFoundSwimmer(string sval)
   return true;
 }
 
-//---------------------------------------------------------
-// Procedure: postShortestPath()
-
-// void GenRescue::postShortestPath()
-// {
-//   // If path has not been set, determine a random path of 9
-//   // points, and make a greedy path from ownship start position.
-//   // Once it has been set, don't change it. But keep posting it
-//   // once every 20 iterations.
-
-//   // 1. If there are no swimmers left, return home
-//   if(m_swimmers.empty()) {
-//     Notify("RETURN", "true");
-//     return;
-//   }
-
-//   // 2. Extract all unrescued swimmers into an unoptimized list
-//   XYSegList unoptimized_path;
-//   std::map<std::string, XYPoint>::iterator p;
-//   for(p = m_swimmers.begin(); p != m_swimmers.end(); p++) {
-//     unoptimized_path.add_vertex(p->second.x(), p->second.y());
-//   }
-
-//   // 3. Optimize the route using your greedyPath algorithm
-//   // (This requires m_nav_x and m_nav_y to be accurate!)
-//   XYSegList optimized_path = greedyPath(unoptimized_path, m_nav_x, m_nav_y);
-
-//   // 4. Give it a label so pMarineViewer draws it properly
-//   optimized_path.set_label("swimmer_path");
-
-//   // 5. Serialize and post
-//   std::string spec = optimized_path.get_spec();
-  
-//   Notify("VIEW_SEGLIST", spec);
-//   Notify("WPT_UPDATE", "points=" + spec); // Make sure WPT_UPDATE matches your .bhv file
-// }
-  
 // //---------------------------------------------------------
 // // Procedure: generateOptimizedPath()
 // //   Purpose: Instead of greedy, first try! 
 
 void GenRescue::generateOptimizedPath()
 {
-  // 1. Check if we have any active swimmers left in the map
+  // 0. Safety Checks
   if (m_swimmers.empty()) {
+    Notify("RETURN", "true"); 
     return; 
   }
+  if (!m_nav_x_set || !m_nav_y_set) {
+    return; 
+  }
+
+  // Hardcoded Athens Bisector
+  double ptA_x = -215.0; double ptA_y = -1.5; 
+  double ptB_x = -45.0;  double ptB_y = -39.5; 
+  double vx = ptB_x - ptA_x; 
+  double vy = ptB_y - ptA_y;
+  if (vx == 0 && vy == 0) { vx = 1.0; } 
+
+  // =========================================================
+  // 1. INITIAL SETUP: Area Split and Visualization
+  // =========================================================
+  if (m_outmost_id == "") { 
     
-  double current_x = m_nav_x;
-  double current_y = m_nav_y;
+    // Draw the yellow dividing line
+    XYSegList div_line;
+    div_line.add_vertex(ptA_x, ptA_y);
+    div_line.add_vertex(ptB_x, ptB_y);
+    div_line.set_label("dividing_line");
+    div_line.set_color("edge", "invisible");
+    div_line.set_color("vertex", "invisible");
+    div_line.set_param("edge_size", "2");
+    Notify("VIEW_SEGLIST", div_line.get_spec());
 
-  // 2. Build the temporary vector of points directly from your map
-  std::vector<XYPoint> temp_points;
-  std::map<string, XYPoint>::iterator p;
-  for(p = m_swimmers.begin(); p != m_swimmers.end(); p++) {
-    temp_points.push_back(p->second);
+    std::map<std::string, XYPoint> list_A;
+    std::map<std::string, XYPoint> list_B;
+
+    for(std::map<string, XYPoint>::iterator it = m_swimmers.begin(); it != m_swimmers.end(); it++) {
+      double sx = it->second.x(); double sy = it->second.y();
+      double cross_product = vx * (sy - ptA_y) - vy * (sx - ptA_x);
+      if (cross_product >= 0) { list_A[it->first] = it->second; } 
+      else { list_B[it->first] = it->second; }
+    }
+
+    std::map<std::string, XYPoint> outbound_swimmers = (list_A.size() >= list_B.size()) ? list_A : list_B;
+
+    // Find the outmost swimmer from Start Position
+    double max_swimmer_dist = -1;
+    for(std::map<string, XYPoint>::iterator it = outbound_swimmers.begin(); it != outbound_swimmers.end(); it++) {
+      double dist = hypot(it->second.x() - m_nav_x, it->second.y() - m_nav_y);
+      if (dist > max_swimmer_dist) {
+        max_swimmer_dist = dist;
+        m_outmost_id = it->first; 
+      }
+    }
+    m_outbound_phase = true;
+  }
+  
+  // =========================================================
+  // 2. PHASE CHECK: Has the Outmost Swimmer been rescued?
+  // =========================================================
+  if (m_outbound_phase && m_swimmers.count(m_outmost_id) == 0) {
+    m_outbound_phase = false; 
   }
 
+  // =========================================================
+  // 3. ROUTING: Populate the Unified 'tour' Vector
+  // =========================================================
   std::vector<XYPoint> tour;
+  double curr_x = m_nav_x;
+  double curr_y = m_nav_y;
+  double init_nav_x = m_nav_x; // Saved specifically for corner-cutting!
+  double init_nav_y = m_nav_y;
 
+  if (m_outbound_phase) {
+    std::map<std::string, XYPoint> list_A;
+    std::map<std::string, XYPoint> list_B;
 
-  // A. Greedy shortest path initial pass
-  while (!temp_points.empty()) {
-    int closest_idx = 0;
-    double min_dist = -1;
-
-    for (unsigned int i = 0; i < temp_points.size(); i++) {
-      double dist = hypot(current_x - temp_points[i].x(), 
-                          current_y - temp_points[i].y());
-      if (min_dist == -1 || dist < min_dist) {
-        min_dist = dist;
-        closest_idx = i;
-      }
+    // Re-evaluate left/right sides dynamically
+    for(std::map<string, XYPoint>::iterator it = m_swimmers.begin(); it != m_swimmers.end(); it++) {
+      double sx = it->second.x(); double sy = it->second.y();
+      if (vx * (sy - ptA_y) - vy * (sx - ptA_x) >= 0) { list_A[it->first] = it->second; } 
+      else { list_B[it->first] = it->second; }
     }
 
-    XYPoint closest_pt = temp_points[closest_idx];
-    tour.push_back(closest_pt);
+    std::map<std::string, XYPoint> outbound_swimmers;
+    std::map<std::string, XYPoint> inbound_swimmers;
 
-    current_x = closest_pt.x();
-    current_y = closest_pt.y();
+    if (list_A.count(m_outmost_id) > 0) {
+      outbound_swimmers = list_A;  inbound_swimmers = list_B;
+    } else {
+      outbound_swimmers = list_B;  inbound_swimmers = list_A;
+    }
 
-    temp_points.erase(temp_points.begin() + closest_idx);
+    // A. Greedy Route Outbound
+    while (!outbound_swimmers.empty()) {
+      std::string closest_id = ""; double closest_dist = -1;
+      for(std::map<string, XYPoint>::iterator it = outbound_swimmers.begin(); it != outbound_swimmers.end(); it++) {
+        double dist = hypot(it->second.x() - curr_x, it->second.y() - curr_y);
+        if (closest_id == "" || dist < closest_dist) { closest_id = it->first; closest_dist = dist; }
+      }
+      tour.push_back(outbound_swimmers[closest_id]);
+      curr_x = outbound_swimmers[closest_id].x(); curr_y = outbound_swimmers[closest_id].y();
+      outbound_swimmers.erase(closest_id);
+    }
+
+    // B. Greedy Route Inbound
+    while (!inbound_swimmers.empty()) {
+      std::string closest_id = ""; double closest_dist = -1;
+      for(std::map<string, XYPoint>::iterator it = inbound_swimmers.begin(); it != inbound_swimmers.end(); it++) {
+        double dist = hypot(it->second.x() - curr_x, it->second.y() - curr_y);
+        if (closest_id == "" || dist < closest_dist) { closest_id = it->first; closest_dist = dist; }
+      }
+      tour.push_back(inbound_swimmers[closest_id]);
+      curr_x = inbound_swimmers[closest_id].x(); curr_y = inbound_swimmers[closest_id].y();
+      inbound_swimmers.erase(closest_id);
+    }
+  } 
+  else {
+    // C. Greedy Route Merged (Post Outbound Phase)
+    std::map<std::string, XYPoint> all_swimmers = m_swimmers;
+    while (!all_swimmers.empty()) {
+      std::string closest_id = ""; double closest_dist = -1;
+      for(std::map<string, XYPoint>::iterator it = all_swimmers.begin(); it != all_swimmers.end(); it++) {
+        double dist = hypot(it->second.x() - curr_x, it->second.y() - curr_y);
+        if (closest_id == "" || dist < closest_dist) { closest_id = it->first; closest_dist = dist; }
+      }
+      tour.push_back(all_swimmers[closest_id]);
+      curr_x = all_swimmers[closest_id].x(); curr_y = all_swimmers[closest_id].y();
+      all_swimmers.erase(closest_id);
+    }
   }
 
-    // B. 2-opt "Untwisting" Algorithm
-    bool improvement = true;
-    while (improvement && tour.size() > 2) {
-      improvement = false;
-      
-      // Loop through all pairs of non-adjacent edges
-      for (int i = 1; i < tour.size() - 1; i++) {
-        for (int k = i + 1; k < tour.size(); k++) {
-          
-          // Calculate distance of the two current edges
-          double dist_current = hypot(tour[i-1].x() - tour[i].x(), tour[i-1].y() - tour[i].y()) +
-                                hypot(tour[k-1].x() - tour[k].x(), tour[k-1].y() - tour[k].y());
-
-          // Calculate the distance if we swapped them
-          double dist_new = hypot(tour[i-1].x() - tour[k-1].x(), tour[i-1].y() - tour[k-1].y()) +
-                            hypot(tour[i].x() - tour[k].x(), tour[i].y() - tour[k].y());
-
-          // If the new distance is strictly shorter, untwist the path!
-          if (dist_new < dist_current) {
-            std::reverse(tour.begin() + i, tour.begin() + k);
-            improvement = true;
-          }
+  // =========================================================
+  // 4. 2-OPT "UNTWISTING" ALGORITHM (Applied to 'tour')
+  // =========================================================
+  bool improvement = true;
+  while (improvement && tour.size() > 2) {
+    improvement = false;
+    for (unsigned int i = 1; i < tour.size() - 1; i++) {
+      for (unsigned int k = i + 1; k < tour.size(); k++) {
+        double dist_current = hypot(tour[i-1].x() - tour[i].x(), tour[i-1].y() - tour[i].y()) +
+                              hypot(tour[k-1].x() - tour[k].x(), tour[k-1].y() - tour[k].y());
+        double dist_new = hypot(tour[i-1].x() - tour[k-1].x(), tour[i-1].y() - tour[k-1].y()) +
+                          hypot(tour[i].x() - tour[k].x(), tour[i].y() - tour[k].y());
+        if (dist_new < dist_current) {
+          std::reverse(tour.begin() + i, tour.begin() + k);
+          improvement = true;
         }
       }
     }
+  }
 
-    // C. Corner-Cutting (Offsetting the points inward)
-    double offset_dist = 3.5; // Keep under 10m to ensure the rescue is triggered!
-    XYSegList my_seglist;
+  // =========================================================
+  // 5. CORNER-CUTTING (Offsetting the points inward)
+  // =========================================================
+  double offset_dist = 2.8; // meters to offset inward
+  XYSegList my_seglist;
 
-    for (unsigned int i = 0; i < tour.size(); i++) {
-      double cx = tour[i].x();
-      double cy = tour[i].y();
+  for (unsigned int i = 0; i < tour.size(); i++) {
+    double cx = tour[i].x();
+    double cy = tour[i].y();
 
-      // We only offset if there is an outgoing leg (not the final point)
-      if (i < tour.size() - 1) {
-        
-        // 1. Define the previous point (either the vehicle, or the previous waypoint)
-        double px = (i == 0) ? current_x : tour[i-1].x();
-        double py = (i == 0) ? current_y : tour[i-1].y();
-        
-        // 2. Define the next point
-        double nx = tour[i+1].x();
-        double ny = tour[i+1].y();
+    // Calculate the turn bisector to pull the point inward
+    if (i < tour.size() - 1) {
+      double px = (i == 0) ? init_nav_x : tour[i-1].x();
+      double py = (i == 0) ? init_nav_y : tour[i-1].y();
+      double nx = tour[i+1].x();
+      double ny = tour[i+1].y();
 
-        double dist_to_prev = hypot(cx - px, cy - py);
-        double dist_to_next = hypot(nx - cx, ny - cy);
+      double dist_to_prev = hypot(cx - px, cy - py);
+      double dist_to_next = hypot(nx - cx, ny - cy);
 
-        // 3. Calculate unit vectors pointing AWAY from the corner
-        if (dist_to_prev > 0.1 && dist_to_next > 0.1) {
-          double v_prev_x = (px - cx) / dist_to_prev;
-          double v_prev_y = (py - cy) / dist_to_prev;
+      if (dist_to_prev > 0.1 && dist_to_next > 0.1) {
+        double v_prev_x = (px - cx) / dist_to_prev;
+        double v_prev_y = (py - cy) / dist_to_prev;
+        double v_next_x = (nx - cx) / dist_to_next;
+        double v_next_y = (ny - cy) / dist_to_next;
 
-          double v_next_x = (nx - cx) / dist_to_next;
-          double v_next_y = (ny - cy) / dist_to_next;
+        double bisect_x = v_prev_x + v_next_x;
+        double bisect_y = v_prev_y + v_next_y;
 
-          // 4. Adding them yields the bisector pointing directly into the turn interior
-          double bisect_x = v_prev_x + v_next_x;
-          double bisect_y = v_prev_y + v_next_y;
-
-          double b_mag = hypot(bisect_x, bisect_y);
-          if (b_mag > 0.1) {
-            // Apply the offset to the point
-            cx += (bisect_x / b_mag) * offset_dist;
-            cy += (bisect_y / b_mag) * offset_dist;
-          }
+        double b_mag = hypot(bisect_x, bisect_y);
+        if (b_mag > 0.1) {
+          cx += (bisect_x / b_mag) * offset_dist;
+          cy += (bisect_y / b_mag) * offset_dist;
         }
       }
-      
-      // D. Build the XYSegList with the new offset points
-      my_seglist.add_vertex(cx, cy);
     }
+    my_seglist.add_vertex(cx, cy); 
+  }
 
-    std::string update_str = "points = ";
-    update_str += my_seglist.get_spec(); 
-    Notify("WPT_UPDATE", update_str);
+  // 6. Command the Helm
+  string update_str = "points = " + my_seglist.get_spec();
+  Notify("WPT_UPDATE", update_str);
 }
-
 //---------------------------------------------------------
 // Procedure: buildReport()
 
