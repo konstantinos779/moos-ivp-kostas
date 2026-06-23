@@ -238,7 +238,7 @@ bool GenRescue::isSwimmerSafe(double sw_x, double sw_y) {
         {-95.0, -28.0}
     };
     
-    double exclusion_radius = 5.0;
+    double exclusion_radius = 5.5;
 
     for (int i = 0; i < 3; i++) {
         double cx = centers[i][0];
