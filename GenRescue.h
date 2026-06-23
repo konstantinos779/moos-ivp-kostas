@@ -57,7 +57,6 @@ class GenRescue : public AppCastingMOOSApp
   XYPolygon  m_region_poly;      // To hold the area coordinates
   // The swimmer tracking map of unrescued swimmers, keyed by their unique ID
   std::map<std::string, XYPoint> m_swimmers;
-  bool isSwimmerSafe(double sw_x, double sw_y); 
   // NEW: Map to remember the IDs of swimmers we have already rescued
   std::map<std::string, bool> m_rescued; 
   bool        m_outbound_phase; // true while we are hunting the outmost point

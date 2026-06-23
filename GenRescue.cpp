@@ -228,36 +228,8 @@ void GenRescue::RegisterVariables()
   // Listen for the official referee game-over signal
   Register("UFRM_FINISHED", 0);
 }
-//---------------------------------------------------------
-// Procedure: isSwimmerSafe()
-bool GenRescue::isSwimmerSafe(double sw_x, double sw_y) {
-    // Define the three circular exclusion zone centers
-    double centers[3][2] = {
-        {-35.0,  -6.0},
-        {-62.5, -17.9},
-        {-95.0, -28.0}
-    };
-    
-    double exclusion_radius = 5.0;
 
-    for (int i = 0; i < 3; i++) {
-        double cx = centers[i][0];
-        double cy = centers[i][1];
 
-        // Calculate the straight-line distance from the swimmer to the center
-        double dx = sw_x - cx;
-        double dy = sw_y - cy;
-        double dist = std::sqrt((dx * dx) + (dy * dy));
-
-        // If the swimmer is INSIDE the 5m circle, reject it completely!
-        if (dist <= exclusion_radius) {
-            return false; 
-        }
-    }
-    
-    // If it survives all three checks, the swimmer is safe to add
-    return true; 
-}
 //---------------------------------------------------------
 // Procedure: handleMailNewSwimmer()
 
@@ -280,15 +252,7 @@ double x = 0;
     else if(param == "id") 
       id = value;
   }
-  // ========================================================
-  // NEW LOGIC: Apply the 5-meter circular exclusion zone filter
-  // ========================================================
-  if (!isSwimmerSafe(x, y)) {
-      // The swimmer is inside a buoy circle. Reject it by returning true 
-      // (we successfully parsed the mail, but choose to ignore the swimmer).
-      return true; 
-  }
-  
+
   // Check if we already know about this swimmer ID
   if(id != "" && m_swimmers.find(id) == m_swimmers.end()&& 
      m_rescued.find(id) == m_rescued.end()) {
