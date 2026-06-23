@@ -238,7 +238,7 @@ bool GenRescue::isSwimmerSafe(double sw_x, double sw_y) {
         {-95.0, -28.0}
     };
     
-    double exclusion_radius = 5.5;
+    double exclusion_radius = 5.95;
 
     for (int i = 0; i < 3; i++) {
         double cx = centers[i][0];
@@ -337,12 +337,13 @@ bool GenRescue::handleMailFoundSwimmer(string sval)
 
     // Permanently mark this ID as rescued so we never add it back!
     m_rescued[id] = true;
+    generateOptimizedPath();
     
     // ONLY recalculate the path if the adversary rescued it!
     // (m_host_community holds this vehicle's name)
-    if (finder != m_host_community) {
-      generateOptimizedPath();
-    }
+    //if (finder != m_host_community) {
+    //  generateOptimizedPath();
+    //}
   }
   
   return true;
@@ -380,7 +381,7 @@ void GenRescue::generateOptimizedPath()
     div_line.add_vertex(ptA_x, ptA_y);
     div_line.add_vertex(ptB_x, ptB_y);
     div_line.set_label("dividing_line");
-    div_line.set_color("edge", "invisible");
+    div_line.set_color("edge", "red");
     div_line.set_color("vertex", "invisible");
     div_line.set_param("edge_size", "2");
     Notify("VIEW_SEGLIST", div_line.get_spec());
