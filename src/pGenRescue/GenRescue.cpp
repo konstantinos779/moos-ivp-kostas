@@ -509,7 +509,7 @@ void GenRescue::generateOptimizedPath()
 
   // 6. Command the Helm
   string update_str = "points = " + my_seglist.get_spec();
-  Notify("WPT_UPDATE", update_str);
+  Notify("SURVEY_UPDATE", update_str);
 }
 //---------------------------------------------------------
 // Procedure: buildReport()
