@@ -288,7 +288,7 @@ double x = 0;
       // (we successfully parsed the mail, but choose to ignore the swimmer).
       return true; 
   }
-  
+
   // Check if we already know about this swimmer ID
   if(id != "" && m_swimmers.find(id) == m_swimmers.end()&& 
      m_rescued.find(id) == m_rescued.end()) {
@@ -364,8 +364,8 @@ void GenRescue::generateOptimizedPath()
   }
 
   // Hardcoded Athens Bisector
-  double ptA_x = -215.0; double ptA_y = -1.5; 
-  double ptB_x = -45.0;  double ptB_y = -39.5; 
+  double ptA_x = -215.0; double ptA_y = -2; 
+  double ptB_x = -46.0;  double ptB_y = -45; 
   double vx = ptB_x - ptA_x; 
   double vy = ptB_y - ptA_y;
   if (vx == 0 && vy == 0) { vx = 1.0; } 
