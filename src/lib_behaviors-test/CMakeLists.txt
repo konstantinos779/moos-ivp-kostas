@@ -3,6 +3,8 @@
 # Author(s):                                
 #--------------------------------------------------------
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
 # Set System Specific Libraries
 if (${WIN32})
   # Windows Libraries
@@ -14,6 +16,11 @@ else (${WIN32})
       m )
 endif (${WIN32})
 
+if(APPLE)
+  set(MBUTIL_LINK mbutil)
+else()
+  set(MBUTIL_LINK -Wl,--whole-archive mbutil -Wl,--no-whole-archive)
+endif()
 
 MACRO(ADD_BHV BHV_NAME)
   ADD_LIBRARY(${BHV_NAME} SHARED ${BHV_NAME}.cpp)
@@ -23,13 +30,29 @@ MACRO(ADD_BHV BHV_NAME)
     ivpbuild 
     logic 
     ivpcore 
-    bhvutil 
-    mbutil 
+    bhvutil
     geometry 
+    ${MBUTIL_LINK}
+    ${MOOS_LIBRARIES} 
     ${SYSTEM_LIBS} )
 ENDMACRO(ADD_BHV)
 
-
+#--------------------------------------------------------
+#                                      BHV_Pulse
+#--------------------------------------------------------
+ADD_LIBRARY(BHV_Pulse SHARED 
+   BHV_Pulse.cpp)
+TARGET_LINK_LIBRARIES(BHV_Pulse
+   helmivp
+   behaviors 
+   ivpbuild 
+   logic 
+   ivpcore 
+   bhvutil
+   geometry 
+   ${MBUTIL_LINK}
+   ${MOOS_LIBRARIES}   
+   ${SYSTEM_LIBS} )
 #--------------------------------------------------------
 #                                      BHV_SimpleWaypoint
 #--------------------------------------------------------
@@ -41,7 +64,25 @@ TARGET_LINK_LIBRARIES(BHV_SimpleWaypoint
    ivpbuild 
    logic 
    ivpcore 
-   bhvutil 
-   mbutil 
+   bhvutil
+   geometry
+   ${MBUTIL_LINK}
+   ${MOOS_LIBRARIES}  
+   ${SYSTEM_LIBS} )
+
+   #--------------------------------------------------------
+#                                      BHV_ZigLeg
+#--------------------------------------------------------
+ADD_LIBRARY(BHV_ZigLeg SHARED 
+   BHV_ZigLeg.cpp)
+TARGET_LINK_LIBRARIES(BHV_ZigLeg
+   helmivp
+   behaviors 
+   ivpbuild 
+   logic 
+   ivpcore 
+   bhvutil
    geometry 
+   ${MBUTIL_LINK}
+   ${MOOS_LIBRARIES}   
    ${SYSTEM_LIBS} )
