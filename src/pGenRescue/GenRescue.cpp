@@ -18,6 +18,8 @@
 #include "PathUtils.h"
 #include "XYFormatUtilsPoly.h"
 #include "XYFieldGenerator.h"
+#include "NodeRecord.h"
+#include "NodeRecordUtils.h"
 
 
 using namespace std;
@@ -42,6 +44,9 @@ GenRescue::GenRescue()
   m_outmost_id = "";
   m_swimmers.clear();
   m_rescued.clear();
+  m_adversary_known = false;
+  m_adv_x = 0.0;
+  m_adv_y = 0.0;
 }
 
 //---------------------------------------------------------
@@ -89,6 +94,18 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
     else if(key == "NAV_Y") {
       m_nav_y = msg.GetDouble();
       m_nav_y_set = true;
+    }
+    else if (key == "NODE_REPORT") {
+        // Parse the incoming NODE_REPORT string into a NodeRecord object
+        NodeRecord record = string2NodeRecord(sval);
+        
+        // Ensure this report belongs to the adversary, NOT our own vehicle!
+        // (m_host_community automatically holds your vehicle's name)
+        if (record.getName() != m_host_community) {
+            m_adv_x = record.getX();
+            m_adv_y = record.getY();
+            m_adversary_known = true;
+        }
     }
     else if (key == "RESCUE_REGION") {
       XYPolygon poly = string2Poly(sval);
@@ -381,7 +398,7 @@ void GenRescue::generateOptimizedPath()
     div_line.add_vertex(ptA_x, ptA_y);
     div_line.add_vertex(ptB_x, ptB_y);
     div_line.set_label("dividing_line");
-    div_line.set_color("edge", "red");
+    div_line.set_color("edge", "invisible");
     div_line.set_color("vertex", "invisible");
     div_line.set_param("edge_size", "2");
     Notify("VIEW_SEGLIST", div_line.get_spec());
@@ -425,6 +442,37 @@ void GenRescue::generateOptimizedPath()
   double curr_y = m_nav_y;
   double init_nav_x = m_nav_x; // Saved specifically for corner-cutting!
   double init_nav_y = m_nav_y;
+
+  // 1. Create a working copy of swimmers to filter before pathing
+std::map<std::string, XYPoint> candidates = m_swimmers;
+
+// ===============================================================
+// NEW: Adversary Concession Strategy (Proximity Filter)
+// Assuming you have parsed the adversary's position from NODE_REPORT 
+// into member variables m_adv_x and m_adv_y
+// ===============================================================
+if (m_adversary_known) { // Flag set to true once NODE_REPORT is received
+    std::map<std::string, XYPoint>::iterator it = candidates.begin();
+    while (it != candidates.end()) {
+        double sx = it->second.x();
+        double sy = it->second.y();
+        
+        // Calculate distance from adversary to this swimmer
+        double dist_to_adv = std::sqrt(pow(sx - m_adv_x, 2) + pow(sy - m_adv_y, 2));
+        
+        // Calculate distance from OUR vehicle to this swimmer
+        double dist_to_us = std::sqrt(pow(sx - curr_x, 2) + pow(sy - curr_y, 2));
+
+        // STRATEGY: Concede the swimmer if the adversary is extremely close 
+        // to it (e.g., < 15 meters) OR if the adversary is significantly 
+        // closer to it than we are.
+        if (dist_to_adv < 15.0 || dist_to_adv < (dist_to_us - 10.0)) {
+            candidates.erase(it++); // Drop it from our pathing pool!
+        } else {
+            ++it;
+        }
+    }
+}
 
   if (m_outbound_phase) {
     std::map<std::string, XYPoint> list_A;

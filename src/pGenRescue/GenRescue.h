@@ -62,6 +62,9 @@ class GenRescue : public AppCastingMOOSApp
   std::map<std::string, bool> m_rescued; 
   bool        m_outbound_phase; // true while we are hunting the outmost point
   std::string m_outmost_id;     // The ID of the trigger swimmer
+  bool   m_adversary_known;
+  double m_adv_x;
+  double m_adv_y;
 
   // Path generation
   void generateOptimizedPath(); 
