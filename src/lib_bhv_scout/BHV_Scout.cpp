@@ -231,7 +231,9 @@ void BHV_Scout::postViewPoint(bool viewable)
 //-----------------------------------------------------------
 // Procedure: buildFunction()
 
-IvPFunction *BHV_Scout::buildFunction() 
+// Procedure: buildFunction()
+
+IvPFunction* BHV_Scout::buildFunction()
 {
   if(!m_pt_set)
     return(0);
@@ -240,7 +242,10 @@ IvPFunction *BHV_Scout::buildFunction()
   spd_zaic.setSummit(m_desired_speed);
   spd_zaic.setPeakWidth(0.5);
   spd_zaic.setBaseWidth(1.0);
-  spd_zaic.setSummitDelta(0.8);  
+  
+  // FIXED: Drop utility by 50 to assert a strong speed preference!
+  spd_zaic.setSummitDelta(50.0);  
+  
   if(spd_zaic.stateOK() == false) {
     string warnings = "Speed ZAIC problems " + spd_zaic.getWarnings();
     postWMessage(warnings);
@@ -252,7 +257,10 @@ IvPFunction *BHV_Scout::buildFunction()
   crs_zaic.setSummit(rel_ang_to_wpt);
   crs_zaic.setPeakWidth(0);
   crs_zaic.setBaseWidth(180.0);
-  crs_zaic.setSummitDelta(0);  
+  
+  // FIXED: Drop utility by 50 to assert a strong heading preference!
+  crs_zaic.setSummitDelta(50.0);  
+  
   crs_zaic.setValueWrap(true);
   if(crs_zaic.stateOK() == false) {
     string warnings = "Course ZAIC problems " + crs_zaic.getWarnings();
