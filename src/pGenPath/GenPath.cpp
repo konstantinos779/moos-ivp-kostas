@@ -47,22 +47,13 @@ bool GenPath::OnNewMail(MOOSMSG_LIST &NewMail)
     string sval  = msg.GetString();
     double dval  = msg.GetDouble();
 
-#if 0 // Keep these around just for template
-    string comm  = msg.GetCommunity();
-    double dval  = msg.GetDouble();
-    string sval  = msg.GetString(); 
-    string msrc  = msg.GetSource();
-    double mtime = msg.GetTime();
-    bool   mdbl  = msg.IsDouble();
-    bool   mstr  = msg.IsString();
-#endif
 
     if (key == "NAV_X") {
       m_nav_x = dval;
     } 
     else if (key == "NAV_Y") {
       m_nav_y = dval;
-    } 
+    }
     else if (key == "VISIT_POINT") {
       if (sval == "firstpoint") {
         m_visit_points.clear();
@@ -70,17 +61,17 @@ bool GenPath::OnNewMail(MOOSMSG_LIST &NewMail)
       else if (sval == "lastpoint") {
         m_all_points_received = true;
       } 
-      else {
-        // Parse the incoming string "x=8, y=9, id=1"
-        string x_str = tokStringParse(sval, "x", ',', '=');
-        string y_str = tokStringParse(sval, "y", ',', '=');
-        string id_str = tokStringParse(sval, "id", ',', '=');
+        else {
+          // Parse the incoming string "x=8, y=9, id=1"
+          string x_str = tokStringParse(sval, "x", ',', '=');
+          string y_str = tokStringParse(sval, "y", ',', '=');
+          string id_str = tokStringParse(sval, "id", ',', '=');
 
-        XYPoint new_pt(atof(x_str.c_str()), atof(y_str.c_str()));
-        new_pt.set_msg(id_str);
-        m_visit_points.push_back(new_pt);
-        m_total_points++;
-      }
+          XYPoint new_pt(atof(x_str.c_str()), atof(y_str.c_str()));
+          new_pt.set_msg(id_str);
+          m_visit_points.push_back(new_pt);
+          m_total_points++;
+        }
     }
     else if(key != "APPCAST_REQ") // handled by AppCastingMOOSApp
     reportRunWarning("Unhandled Mail: " + key);
@@ -242,6 +233,7 @@ void GenPath::registerVariables()
   Register("NAV_X", 0);
   Register("NAV_Y", 0);
   Register("VISIT_POINT", 0);
+  Register("NODE_REPORT", 0);
 }
 
 

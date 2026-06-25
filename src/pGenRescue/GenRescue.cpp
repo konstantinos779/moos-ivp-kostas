@@ -95,18 +95,6 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
       m_nav_y = msg.GetDouble();
       m_nav_y_set = true;
     }
-    else if (key == "NODE_REPORT") {
-        // Parse the incoming NODE_REPORT string into a NodeRecord object
-        NodeRecord record = string2NodeRecord(sval);
-        
-        // Ensure this report belongs to the adversary, NOT our own vehicle!
-        // (m_host_community automatically holds your vehicle's name)
-        if (record.getName() != m_host_community) {
-            m_adv_x = record.getX();
-            m_adv_y = record.getY();
-            m_adversary_known = true;
-        }
-    }
     else if (key == "RESCUE_REGION") {
       XYPolygon poly = string2Poly(sval);
       if (poly.is_convex()) {
@@ -134,6 +122,14 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
       if (m_region_poly.is_convex()) {
         m_region_received = true;
       }
+    }
+    else if(key == "NODE_REPORT") {
+      NodeRecord my_record = string2NodeRecord(sval);
+      
+      string contact_name  = my_record.getName();
+      double contact_xpos  = my_record.getX();
+      double contact_ypos  = my_record.getY();
+      double contact_hdg   = my_record.getHeading();
     }
     else if (key == "STATION_KEEP") {
       // You can store this in a class boolean (e.g., m_station_keeping) 
@@ -237,7 +233,7 @@ void GenRescue::RegisterVariables()
   Register("TOUR_COMPLETE", 0); 
   Register("RETURN", 0);
   Register("STATION_KEEP", 0); //Keep returning errors
-
+  Register("NODE_REPORT", 0);
   // tracking its own position
   Register("NAV_X", 0);
   Register("NAV_Y", 0);

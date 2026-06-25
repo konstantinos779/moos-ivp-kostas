@@ -10,6 +10,8 @@
 #include "GenRescue_Info.h"
 #include "ColorParse.h"
 #include "ReleaseInfo.h"
+#include "NodeRecord.h"
+#include "NodeRecordUtils.h"
 
 using namespace std;
 
